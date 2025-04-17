@@ -2,8 +2,8 @@ name: Sync Fork with Upstream
 
 on:
   schedule:
-    - cron: '0 12 * * *'  # Runs every day at 9AM UTC
-  workflow_dispatch:     # Allows you to manually trigger the action from GitHub
+    - cron: '0 12 * * *'  # Runs every day at 6PM GMT+6 (12PM UTC)
+  workflow_dispatch:       # Allows manual trigger from GitHub
 
 jobs:
   sync:
