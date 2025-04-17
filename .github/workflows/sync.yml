@@ -22,6 +22,10 @@ jobs:
           git remote add upstream https://github.com/Vencord/Vencord.git
           git fetch upstream
 
+      - name: Set up merge strategy for userplugins
+        run: |
+          git config merge.ours.driver true
+
       - name: Merge upstream changes
         run: |
           git checkout main
