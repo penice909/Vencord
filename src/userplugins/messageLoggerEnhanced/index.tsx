@@ -270,8 +270,9 @@ export default definePlugin({
             }
         },
 
+        // https://regex101.com/r/JD9Qav/1
         {
-            find: ",guildId:void 0}),childrenMessageContent",
+            find: /=!0,disableInteraction:/,
             replacement: {
                 match: /(cozyMessage.{1,50},)childrenHeader:/,
                 replace: "$1childrenAccessories:arguments[0].childrenAccessories || null,childrenHeader:"
@@ -318,14 +319,14 @@ export default definePlugin({
 
     addIconToToolBar(e: { toolbar: React.ReactNode[] | React.ReactNode; }) {
         if (Array.isArray(e.toolbar))
-            return e.toolbar.push(
+            return e.toolbar.unshift(
                 <ErrorBoundary noop={true}>
                     <OpenLogsButton />
                 </ErrorBoundary>
             );
 
         e.toolbar = [
-            <ErrorBoundary noop={true}>
+            <ErrorBoundary noop={true} key="ml-button">
                 <OpenLogsButton />
             </ErrorBoundary>,
             e.toolbar,
@@ -382,9 +383,20 @@ export default definePlugin({
         // we have to do this because the original message logger fetches the message from the store now
         MessageStore.getMessage = (channelId: string, messageId: string) => {
             const MLMessage = idb.cachedMessages.get(messageId);
-            if (MLMessage) return messageJsonToMessageClass({ message: MLMessage });
+            if (!MLMessage)
+                return this.oldGetMessage(channelId, messageId);
 
-            return this.oldGetMessage(channelId, messageId);
+            if (MLMessage.deleted)
+                return messageJsonToMessageClass({ message: MLMessage });
+
+            // update the edited message with the latest data
+            const latestMessage = this.oldGetMessage(channelId, messageId);
+            return messageJsonToMessageClass({
+                message: {
+                    ...MLMessage,
+                    ...(latestMessage ?? {}),
+                }
+            });
         };
 
         checkForUpdatesAndNotify(settings.store.autoCheckForUpdates);
