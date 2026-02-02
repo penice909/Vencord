@@ -5,6 +5,7 @@
  */
 
 import { addContextMenuPatch, NavContextMenuPatchCallback, removeContextMenuPatch } from "@api/ContextMenu";
+import { findStoreLazy } from "@webpack";
 import { FluxDispatcher, Menu, MessageActions, React, Toasts, UserStore } from "@webpack/common";
 
 import { openLogModal } from "../components/LogsModal";
@@ -12,29 +13,36 @@ import { deleteMessageIDB } from "../db";
 import { settings } from "../index";
 import { addToXAndRemoveFromOpposite, ListType, removeFromX } from ".";
 
+const SortedGuildStore = findStoreLazy("SortedGuildStore");
+
 const idFunctions = {
+    Folder: props =>
+        props?.folderId &&
+        SortedGuildStore?.getGuildFolders?.().find(f => f?.folderId === props.folderId)?.guildIds,
     Server: props => props?.guild?.id,
     User: props => props?.message?.author?.id || props?.user?.id,
     Channel: props => props.message?.channel_id || props.channel?.id
-} as const;
+} as Record<string, (props: any) => string | string[] | null | undefined>;
 
 type idKeys = keyof typeof idFunctions;
 
 function renderListOption(listType: ListType, IdType: idKeys, props: any) {
-    const id = idFunctions[IdType](props);
-    if (!id) return null;
+    const rawId = idFunctions[IdType](props);
+    if (!rawId) return null;
 
-    const isBlocked = settings.store[listType].includes(id);
+    const ids = Array.isArray(rawId) ? rawId : [rawId];
+
+    const isBlocked = ids.every(id => settings.store[listType].includes(id));
     const oppositeListType = listType === "blacklistedIds" ? "whitelistedIds" : "blacklistedIds";
-    const isOppositeBlocked = settings.store[oppositeListType].includes(id);
+    const isOppositeBlocked = ids.some(id => settings.store[oppositeListType].includes(id));
     const list = listType === "blacklistedIds" ? "Blacklist" : "Whitelist";
 
-    const addToList = () => addToXAndRemoveFromOpposite(listType, id);
-    const removeFromList = () => removeFromX(listType, id);
+    const addToList = () => ids.forEach(id => addToXAndRemoveFromOpposite(listType, id));
+    const removeFromList = () => ids.forEach(id => removeFromX(listType, id));
 
     return (
         <Menu.MenuItem
-            id={`${listType}-${IdType}-${id}`}
+            id={`${listType}-${IdType}-${ids[0]}`}
             label={
                 isOppositeBlocked
                     ? `Move ${IdType} to ${list}`
@@ -47,7 +55,8 @@ function renderListOption(listType: ListType, IdType: idKeys, props: any) {
 
 function renderOpenLogs(idType: idKeys, props: any) {
     const id = idFunctions[idType](props);
-    if (!id) return null;
+    // TODO: rewrite logs modal to accept arrays
+    if (!id || Array.isArray(id)) return null;
 
     return (
         <Menu.MenuItem
@@ -114,7 +123,6 @@ export const contextMenuPath: NavContextMenuPatchCallback = (children, props) =>
                                             message: "Failed to remove message",
                                             id: Toasts.genId()
                                         }))
-
                                 }
                             />
                         </>
@@ -143,7 +151,6 @@ export const contextMenuPath: NavContextMenuPatchCallback = (children, props) =>
                                         "validNonShortcutEmojis": []
                                     }, { nonce: props.message.id });
                                 }}
-
                             />
                         </>
                     )

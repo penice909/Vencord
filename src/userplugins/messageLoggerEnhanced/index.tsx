@@ -195,7 +195,10 @@ async function processMessageFetch(response: FetchMessagesResponse) {
 
         if (!messages.length) return;
 
-        const deletedMessages = messages.filter(m => m.status === idb.DBMessageStatus.DELETED);
+        const deletedMessages = messages.filter(m =>
+            m.status === idb.DBMessageStatus.DELETED ||
+            m.status === idb.DBMessageStatus.GHOST_PINGED
+        );
 
         for (const recivedMessage of response.body) {
             const record = messages.find(m => m.message_id === recivedMessage.id);
@@ -262,7 +265,7 @@ export default definePlugin({
             }
         },
         {
-            find: "toolbar:function",
+            find: /toolbar:\i,mobileToolbar:\i/,
             predicate: () => settings.store.ShowLogsButton,
             replacement: {
                 match: /(function \i\(\i\){)(.{1,200}toolbar.{1,100}mobileToolbar)/,
@@ -271,11 +274,12 @@ export default definePlugin({
         },
 
         // https://regex101.com/r/JD9Qav/1
+        // MessagePreview component in LogsModal
         {
-            find: /=!0,disableInteraction:/,
+            find: "=!0,disableInteraction:",
             replacement: {
-                match: /(cozyMessage.{1,50},)childrenHeader:/,
-                replace: "$1childrenAccessories:arguments[0].childrenAccessories || null,childrenHeader:"
+                match: /childrenHeader:.{0,100}childrenMessageContent/,
+                replace: "childrenAccessories:arguments[0].childrenAccessories || null,$&"
             }
         },
 

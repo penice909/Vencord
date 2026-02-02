@@ -167,9 +167,11 @@ export function addToXAndRemoveFromOpposite(list: ListType, id: string) {
 
 export function addToX(list: ListType, id: string) {
     const items = settings.store[list] ? settings.store[list].split(",") : [];
-    items.push(id);
 
-    settings.store[list] = items.join(",");
+    if (!items.includes(id)) {
+        items.push(id);
+        settings.store[list] = items.join(",");
+    }
 }
 
 export function removeFromX(list: ListType, id: string) {
@@ -177,6 +179,6 @@ export function removeFromX(list: ListType, id: string) {
     const index = items.indexOf(id);
     if (index !== -1) {
         items.splice(index, 1);
+        settings.store[list] = items.join(",");
     }
-    settings.store[list] = items.join(",");
 }
