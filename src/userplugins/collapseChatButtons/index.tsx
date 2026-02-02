@@ -10,9 +10,16 @@ import ErrorBoundary from "@components/ErrorBoundary";
 import { Devs } from "@utils/constants";
 import definePlugin, { OptionType, StartAt } from "@utils/types";
 import { useMemo, useState } from "@webpack/common";
-import { MouseEventHandler } from "react";
+import { MouseEventHandler, ReactElement } from "react";
 
 let collapsechatbuttonsopen: boolean | undefined;
+
+const excluded = new Set();
+
+function UpdateExcludedButtons(val: string) {
+    excluded.clear();
+    val.split(";").map(x => x.trim()).forEach(excluded.add.bind(excluded));
+}
 
 const settings = definePluginSettings({
     Open: {
@@ -24,6 +31,12 @@ const settings = definePluginSettings({
             collapsechatbuttonsopen = store.open;
         }
     },
+    ExcludedButtons: {
+        type: OptionType.STRING,
+        description: "Semi colon separated list of buttons (IDs), you have gift, emoji, sticker, appLauncher and vencord-chat-buttons and maybe others. NOTE this doesn't support custom buttons by plugins and names should be lower case!",
+        default: "submit;",
+        onChange: UpdateExcludedButtons
+    }
 });
 
 function CollapseToggleButton(props: { open: boolean | undefined, onClick: MouseEventHandler<HTMLButtonElement>; }) {
@@ -49,43 +62,55 @@ function CollapseToggleButton(props: { open: boolean | undefined, onClick: Mouse
     </ChatBarButton>);
 }
 
-function ButtonsWrapper({ buttons, disabled } : { buttons: React.ReactNode[]; disabled: boolean; }) {
+function ButtonsWrapper({ buttons, disabled }: { buttons: React.ReactNode[]; disabled: boolean; }) {
     if (disabled) return;
     const [open, setOpen] = useState(collapsechatbuttonsopen);
 
     useMemo(() => {
         collapsechatbuttonsopen = open;
     }, [open]);
+    const excludedButtons: React.ReactNode[] = [];
+    const includedButtons: React.ReactNode[] = [];
+    for (const button of buttons) {
+        if (excluded.has((button as ReactElement)?.key)) {
+            excludedButtons.push(button);
+            continue;
+        }
+        includedButtons.push(button);
+    }
 
-    const buttonList = (
+    return (
         <div id="chat-bar-buttons-menu" style={{
             display: "flex",
             flexWrap: "nowrap",
-            overflowX: "auto"
+            overflow: "hidden",
         }}>
-            {open ? buttons : null}
+            {open ? includedButtons : null}
             <CollapseToggleButton onClick={() => setOpen(!open)} open={open}></CollapseToggleButton>
+            {excludedButtons}
         </div>
     );
-    buttons = [buttonList];
-    return buttons;
 }
 
 export default definePlugin({
     name: "CollapseChatButtons",
     description: "able to collapse the chat buttons",
     settings: settings,
+    dependencies: ["ChatInputButtonAPI"],
     authors: [Devs.iamme],
     patches: [
         {
-            find: '"sticker")',
+            find: "\"sticker\")",
             replacement: {
-                match: /(.buttons,children:)(\i)\}/,
-                replace: "$1$self.ButtonsWrapper($2, arguments[0])}"
+                match: /(.buttons,.{20}children:)([^}]+)/,
+                replace: "$1$self.ButtonsWrapper($2, arguments[0])"
             }
         }
     ],
     startAt: StartAt.Init,
     ButtonsWrapper: (buttons: React.ReactNode[], props: any) => <ErrorBoundary><ButtonsWrapper buttons={buttons} {...props} /></ErrorBoundary>,
-    start: async () => { collapsechatbuttonsopen = settings.store.Open; }
+    start: async () => {
+        collapsechatbuttonsopen = settings.store.Open;
+        UpdateExcludedButtons(settings.store.ExcludedButtons);
+    }
 });
