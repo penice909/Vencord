@@ -20,6 +20,7 @@ lerna-debug.log*
 *.tsbuildinfo
 
 src/userplugins
+/borked/
 
 ExtensionCache/
 /settings
